@@ -12,7 +12,7 @@ class GAT(nn.Module):
 
         self.attentions = [GraphAttentionLayer(nfeat, nhid, dropout=dropout, alpha=alpha, concat=True) for _ in range(nheads)]
         for i, attention in enumerate(self.attentions):
-            self.add_module('attention_{}'.format(i), attention)
+            self.add_module('attention_{}'.format(i), attention)  # important add to graph
 
         self.out_att = GraphAttentionLayer(nhid * nheads, nclass, dropout=dropout, alpha=alpha, concat=False)
 
