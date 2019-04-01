@@ -34,8 +34,8 @@ class GraphAttentionLayer(nn.Module):
         zero_vec = -9e15*torch.ones_like(e)
         attention = torch.where(adj > 0, e, zero_vec)
         attention = F.softmax(attention, dim=1)
-        attention = F.dropout(attention, self.dropout, training=self.training)
-        h_prime = torch.matmul(attention, h)
+        attention = F.dropout(attention, self.dropout, training=self.training)  # N * N
+        h_prime = torch.matmul(attention, h)  # N * features
 
         if self.concat:
             return F.elu(h_prime)
