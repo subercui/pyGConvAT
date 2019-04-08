@@ -46,6 +46,24 @@ def load_data(path="./data/cora/", dataset="cora"):
     return adj, features, labels, idx_train, idx_val, idx_test
 
 
+def load_dataset(seed):
+    d = np.load('EEG_data/dataset_aug.npz')
+    x_pos = d["arr_0"][:, :, :, 0]
+    y_pos = d["arr_1"]
+    x_neg = d["arr_2"][:, :, :, 0]
+    y_neg = d["arr_3"]
+
+    X = np.concatenate([x_pos, x_neg], axis=0)
+    Y = np.concatenate([y_pos, y_neg], axis=0)
+    np.random.seed(seed)
+    random_order = np.random.permutation(X.shape[0])
+    X = X[random_order]
+    Y = Y[random_order]
+    print('Number of samples: {:d}'.format(X.shape[0]))
+    print('Percentage of pos channels in all labels: {:.2f}%'.format(sum(sum(Y)) / Y.size * 100))
+    return X, Y
+
+
 def normalize_adj(mx):
     """Row-normalize sparse matrix"""
     rowsum = np.array(mx.sum(1))

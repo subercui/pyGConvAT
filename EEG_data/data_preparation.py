@@ -128,7 +128,7 @@ def get_data(raw, locs, labels):
             x_pos.append(normalization(data[:, :, start_point : end_point, :]))
             y_pos.append(translate(ch_names, labels[loc]))
 
-    PNRATIO = 3
+    PNRATIO = 1
     for i in range(data.shape[2] - int(win_size*sfreq)):
         s = np.random.randint(data.shape[2] - int(win_size*sfreq))
         ACCEPT = True
