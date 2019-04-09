@@ -26,7 +26,7 @@ parser.add_argument('--epochs', type=int, default=200, help='Number of epochs to
 parser.add_argument('--batch', type=int, default=64, help='Number of samples in a mini batch.')
 parser.add_argument('--lr', type=float, default=0.001, help='Initial learning rate.')
 parser.add_argument('--weight_decay', type=float, default=5e-4, help='Weight decay (L2 loss on parameters).')
-parser.add_argument('--hidden', type=int, default=12, help='Number of hidden units.')
+parser.add_argument('--hidden', type=int, default=8, help='Number of hidden units.')
 parser.add_argument('--nb_heads', type=int, default=4, help='Number of head attentions.')
 parser.add_argument('--dropout', type=float, default=0.1, help='Dropout rate (1 - keep probability).')  # this is important
 parser.add_argument('--alpha', type=float, default=0.2, help='Alpha for the leaky_relu.')
