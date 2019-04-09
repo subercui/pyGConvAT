@@ -94,7 +94,7 @@ class Conv1dGroup(nn.Module):
     """
     A group of 3 layer 1d conv layers
     """
-    def __init__(self, out_channels=8):
+    def __init__(self, out_channels=8, cat_input=False):
         super(Conv1dGroup, self).__init__()
         c_out = out_channels
         self.conv1 = nn.Conv1d(in_channels=1, out_channels=c_out, kernel_size=10, stride=2, dilation=1)
@@ -102,12 +102,16 @@ class Conv1dGroup(nn.Module):
         self.conv2 = nn.Conv1d(in_channels=c_out, out_channels=c_out, kernel_size=5, stride=1, dilation=1)
         self.conv3 = nn.Conv1d(in_channels=c_out, out_channels=c_out, kernel_size=5, stride=1, dilation=2)
         self.c_out = c_out
+        self.cat_in = cat_input
 
     def calc_out_features(self, in_features):
         out1_feaures = round((in_features-10)/2 + 1)
         out2_features = round((out1_feaures-5)/1 + 1)
-        out3_features = round((out2_features-2*(5-1)-1)/1 + 1)
+        pooled = round((out2_features-(2-1)-1)/2 +1)
+        out3_features = round((pooled-2*(5-1)-1)/1 + 1)
         out_features = self.c_out * (out2_features+out3_features)
+        if self.cat_in:
+            out_features = in_features + out_features
         return out_features
 
     def forward(self, x):
@@ -121,7 +125,8 @@ class Conv1dGroup(nn.Module):
         # conv
         out1 = F.relu(self.conv1(x))  # (batch*chanels, c_out, features1)
         out2 = F.relu(self.conv2(out1))  # (batch*chanels, c_out, features2)
-        out3 = F.relu(self.conv3(out2))  # (batch*chanels, c_out, features3)
+        pooled = F.max_pool1d(out2, kernel_size=2)
+        out3 = F.relu(self.conv3(pooled))  # (batch*chanels, c_out, features3)
 
         # concatenate conv outputs
         out = torch.cat([
@@ -129,6 +134,9 @@ class Conv1dGroup(nn.Module):
             out3.view(batch*channels, -1)
         ], dim=-1)  # (batch*chanels, features)
         out = out.view(batch, channels, out.size(1))
+
+        if self.cat_in:
+            out = torch.cat([x.view(batch, channels, x.size(2)), out], dim=-1)
 
         return out
 
