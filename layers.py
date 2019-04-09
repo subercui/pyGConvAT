@@ -107,7 +107,7 @@ class Conv1dGroup(nn.Module):
         out1_feaures = round((in_features-10)/2 + 1)
         out2_features = round((out1_feaures-5)/1 + 1)
         out3_features = round((out2_features-2*(5-1)-1)/1 + 1)
-        out_features = self.c_out * (out1_feaures+out2_features+out3_features)
+        out_features = self.c_out * (out2_features+out3_features)
         return out_features
 
     def forward(self, x):
@@ -125,7 +125,6 @@ class Conv1dGroup(nn.Module):
 
         # concatenate conv outputs
         out = torch.cat([
-            out1.view(batch*channels, -1),
             out2.view(batch*channels, -1),
             out3.view(batch*channels, -1)
         ], dim=-1)  # (batch*chanels, features)
