@@ -9,7 +9,7 @@ class GraphAttentionLayer(nn.Module):
     Simple GAT layer, similar to https://arxiv.org/abs/1710.10903
     """
 
-    def __init__(self, in_features, out_features, dropout, alpha, concat=True):
+    def __init__(self, in_features, out_features, dropout, alpha, concat=True, Wb=False):
         super(GraphAttentionLayer, self).__init__()
         self.dropout = dropout
         self.in_features = in_features
@@ -19,8 +19,11 @@ class GraphAttentionLayer(nn.Module):
 
         self.W = nn.Parameter(torch.zeros(size=(in_features, out_features)))  # important - Parameter() add vector to back prop
         nn.init.xavier_uniform_(self.W.data, gain=1.414)
-        self.a = nn.Parameter(torch.zeros(size=(2*out_features, 1)))
+        self.a = nn.Parameter(torch.zeros(size=(3*out_features, 1)))
         nn.init.xavier_uniform_(self.a.data, gain=1.414)
+        self.IF_Wb = Wb
+        if self.IF_Wb:
+            self.encoder = nn.Linear(in_features=in_features, out_features=out_features)
 
         self.leakyrelu = nn.LeakyReLU(self.alpha)
 
@@ -30,14 +33,21 @@ class GraphAttentionLayer(nn.Module):
         h = input.matmul(self.W)  # batch * nodes * features
         N = h.size()[1]  # nodes
 
-        a_input = torch.cat([h.repeat(1, 1, N).view(B, N * N, -1), h.repeat(1, N, 1)], dim=2).view(B, N, -1, 2 * self.out_features)
+        H_self = h.repeat(1, 1, N).view(B, N * N, -1)  # (N, nodes*nodes, features)
+        H_neibor = h.repeat(1, N, 1)
+        H_corr = H_self * H_neibor
+        a_input = torch.cat([H_self, H_neibor, H_corr], dim=2).view(B, N, -1, 3 * self.out_features)
         e = self.leakyrelu(torch.matmul(a_input, self.a).squeeze(3))  # attention coefficient, batch * N * N #TODO: need more layers, add h.*h
 
         zero_vec = -9e15*torch.ones_like(e)
         attention = torch.where(adj > 0, e, zero_vec)
         attention = F.softmax(attention, dim=-1)
         attention = F.dropout(attention, self.dropout, training=self.training)  # N * N, attention[0][1] sums to 1.
-        h_prime = torch.bmm(attention, h)  # N * features #TODO: add the self h vector
+        if self.IF_Wb:
+            h_ = self.encoder(input)  # encode with a different W
+            h_prime = torch.matmul(attention, h_)  # N * features
+        else:
+            h_prime = torch.matmul(attention, h)  # N * features
 
         if self.concat:
             return F.elu(h_prime)
@@ -53,7 +63,7 @@ class GraphAttentionLayer_NoBatch(nn.Module):
     Simple GAT layer, similar to https://arxiv.org/abs/1710.10903
     """
 
-    def __init__(self, in_features, out_features, dropout, alpha, concat=True):
+    def __init__(self, in_features, out_features, dropout, alpha, concat=True, Wb=True):
         super(GraphAttentionLayer_NoBatch, self).__init__()
         self.dropout = dropout
         self.in_features = in_features
@@ -65,7 +75,9 @@ class GraphAttentionLayer_NoBatch(nn.Module):
         nn.init.xavier_uniform_(self.W.data, gain=1.414)
         self.a = nn.Parameter(torch.zeros(size=(2*out_features, 1)))
         nn.init.xavier_uniform_(self.a.data, gain=1.414)
-        self.encoder = nn.Linear(in_features=in_features, out_features=out_features)
+        self.IF_Wb = Wb
+        if self.IF_Wb:
+            self.encoder = nn.Linear(in_features=in_features, out_features=out_features)
 
         self.leakyrelu = nn.LeakyReLU(self.alpha)
 
@@ -73,7 +85,10 @@ class GraphAttentionLayer_NoBatch(nn.Module):
         h = torch.mm(input, self.W)  # nodes * features
         N = h.size()[0]  # nodes
 
-        a_input = torch.cat([h.repeat(1, N).view(N * N, -1), h.repeat(N, 1)], dim=1).view(N, -1, 2 * self.out_features)
+        H_self = h.repeat(1, N).view(N * N, -1)  # (nodes, nodes, features)
+        H_neibor = h.repeat(N, 1)
+        H_corr = H_self * H_neibor
+        a_input = torch.cat([H_self, H_neibor, H_corr], dim=1).view(N, -1, 2 * self.out_features)
         e = self.leakyrelu(torch.matmul(a_input, self.a).squeeze(2))  # attention coefficient, N * N
 
         zero_vec = -9e15*torch.ones_like(e)
