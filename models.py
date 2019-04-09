@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from layers import GraphAttentionLayer, SpGraphAttentionLayer
+from layers import GraphAttentionLayer, SpGraphAttentionLayer, Conv1dGroup
 
 
 class GAT(nn.Module):
@@ -10,7 +10,9 @@ class GAT(nn.Module):
         super(GAT, self).__init__()
         self.dropout = dropout
 
-        self.attentions = [GraphAttentionLayer(nfeat, nhid, dropout=dropout, alpha=alpha, concat=True) for _ in range(nheads)]
+        self.conv_encoder = Conv1dGroup(out_channels=nheads)
+        enc_nfeat = self.conv_encoder.calc_out_features(in_features=nfeat)
+        self.attentions = [GraphAttentionLayer(enc_nfeat, nhid, dropout=dropout, alpha=alpha, concat=True) for _ in range(nheads)]
         for i, attention in enumerate(self.attentions):
             self.add_module('attention_{}'.format(i), attention)  # important add to graph
 
@@ -20,7 +22,8 @@ class GAT(nn.Module):
 
     def forward(self, x, adj):
         x = F.dropout(x, self.dropout, training=self.training)
-        x = torch.cat([att(x, adj) for att in self.attentions], dim=-1)
+        enc_out = self.conv_encoder(x)
+        x = torch.cat([att(enc_out, adj) for att in self.attentions], dim=-1)
         x = F.dropout(x, self.dropout, training=self.training)
         x = F.elu(self.out_layer1(x))
         x = self.out_layer2(x)
