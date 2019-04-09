@@ -14,13 +14,16 @@ class GAT(nn.Module):
         for i, attention in enumerate(self.attentions):
             self.add_module('attention_{}'.format(i), attention)  # important add to graph
 
-        self.out_att = GraphAttentionLayer(nhid * nheads, nclass, dropout=dropout, alpha=alpha, concat=False)
+        # self.out_att = GraphAttentionLayer(nhid * nheads, nclass, dropout=dropout, alpha=alpha, concat=False)
+        self.out_layer1 = nn.Linear(in_features=nhid * nheads, out_features=10)
+        self.out_layer2 = nn.Linear(in_features=10, out_features=nclass)
 
     def forward(self, x, adj):
         x = F.dropout(x, self.dropout, training=self.training)
         x = torch.cat([att(x, adj) for att in self.attentions], dim=-1)
         x = F.dropout(x, self.dropout, training=self.training)
-        x = F.elu(self.out_att(x, adj))
+        x = F.elu(self.out_layer1(x))
+        x = self.out_layer2(x)
         out = F.log_softmax(x, dim=-1)
         return out
 
