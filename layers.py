@@ -65,6 +65,7 @@ class GraphAttentionLayer_NoBatch(nn.Module):
         nn.init.xavier_uniform_(self.W.data, gain=1.414)
         self.a = nn.Parameter(torch.zeros(size=(2*out_features, 1)))
         nn.init.xavier_uniform_(self.a.data, gain=1.414)
+        self.encoder = nn.Linear(in_features=in_features, out_features=out_features)
 
         self.leakyrelu = nn.LeakyReLU(self.alpha)
 
@@ -79,7 +80,8 @@ class GraphAttentionLayer_NoBatch(nn.Module):
         attention = torch.where(adj > 0, e, zero_vec)
         attention = F.softmax(attention, dim=1)
         attention = F.dropout(attention, self.dropout, training=self.training)  # N * N
-        h_prime = torch.matmul(attention, h)  # N * features
+        h_ = self.encoder(input)  # encode with a different W
+        h_prime = torch.matmul(attention, h_)  # N * features
 
         if self.concat:
             return F.elu(h_prime)
