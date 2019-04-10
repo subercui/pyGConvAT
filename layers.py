@@ -19,6 +19,8 @@ class GraphAttentionLayer(nn.Module):
 
         self.W = nn.Parameter(torch.zeros(size=(in_features, out_features)))  # important - Parameter() add vector to back prop
         nn.init.xavier_uniform_(self.W.data, gain=1.414)
+        self.W_in = nn.Parameter(torch.zeros(size=(in_features, out_features)))
+        nn.init.xavier_uniform_(self.W_in.data, gain=1.414)
         self.a = nn.Parameter(torch.zeros(size=(3*out_features, 1)))
         nn.init.xavier_uniform_(self.a.data, gain=1.414)
         self.IF_Wb = Wb
@@ -35,7 +37,7 @@ class GraphAttentionLayer(nn.Module):
 
         H_self = h.repeat(1, 1, N).view(B, N * N, -1)  # (N, nodes*nodes, features)
         H_neibor = h.repeat(1, N, 1)
-        H_corr = (input.repeat(1, 1, N).view(B, N * N, -1) * input.repeat(1, N, 1)).matmul(self.W)
+        H_corr = (input.repeat(1, 1, N).view(B, N * N, -1) * input.repeat(1, N, 1)).matmul(self.W_in)
         a_input = torch.cat([H_self, H_neibor, H_corr], dim=2).view(B, N, -1, 3 * self.out_features)
         e = self.leakyrelu(torch.matmul(a_input, self.a).squeeze(3))  # attention coefficient, batch * N * N #TODO: need more layers, add h.*h
 
