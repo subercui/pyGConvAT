@@ -164,6 +164,7 @@ if __name__=='__main__':
             best = loss_values[-1]
             best_epoch = epoch
             bad_counter = 0
+            print('save best to:', save_dir)
         else:
             bad_counter += 1
 
@@ -172,13 +173,13 @@ if __name__=='__main__':
 
         files = glob.glob('{}/*.pkl'.format(save_dir))
         for file in files:
-            epoch_nb = int(file.split('.')[0])
+            epoch_nb = int(file.split('/')[-1].split('.')[0])
             if epoch_nb < best_epoch:
                 os.remove(file)
 
     files = glob.glob('{}/*.pkl'.format(save_dir))
     for file in files:
-        epoch_nb = int(file.split('.')[0])
+        epoch_nb = int(file.split('/')[-1].split('.')[0])
         if epoch_nb > best_epoch:
             os.remove(file)
 
