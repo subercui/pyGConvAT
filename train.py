@@ -150,6 +150,8 @@ if __name__=='__main__':
 
     # Train model
     t_total = time.time()
+    save_dir = time.strftime('output(%b %d %H.%M.%S %Y)')
+    os.mkdir(save_dir)
     loss_values = []
     bad_counter = 0
     best = args.epochs + 1
@@ -157,7 +159,7 @@ if __name__=='__main__':
     for epoch in range(args.epochs):
         loss_values.append(train(epoch))
 
-        torch.save(model.state_dict(), '{}.pkl'.format(epoch))
+        torch.save(model.state_dict(), '{}/{}.pkl'.format(save_dir, epoch))
         if loss_values[-1] < best:
             best = loss_values[-1]
             best_epoch = epoch
@@ -168,13 +170,13 @@ if __name__=='__main__':
         if bad_counter == args.patience:
             break
 
-        files = glob.glob('*.pkl')
+        files = glob.glob('{}/*.pkl'.format(save_dir))
         for file in files:
             epoch_nb = int(file.split('.')[0])
             if epoch_nb < best_epoch:
                 os.remove(file)
 
-    files = glob.glob('*.pkl')
+    files = glob.glob('{}/*.pkl'.format(save_dir))
     for file in files:
         epoch_nb = int(file.split('.')[0])
         if epoch_nb > best_epoch:
@@ -185,7 +187,7 @@ if __name__=='__main__':
 
     # Restore best model
     print('Loading {}th epoch'.format(best_epoch))
-    model.load_state_dict(torch.load('{}.pkl'.format(best_epoch)))
+    model.load_state_dict(torch.load('{}/{}.pkl'.format(save_dir, best_epoch)))
 
     # Testing
     compute_test()
