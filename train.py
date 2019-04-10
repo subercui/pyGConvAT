@@ -172,13 +172,13 @@ if __name__=='__main__':
 
         files = glob.glob('{}/*.pkl'.format(save_dir))
         for file in files:
-            epoch_nb = int(file.split('.')[0])
+            epoch_nb = int(file.split('/')[-1].split('.')[0])
             if epoch_nb < best_epoch:
                 os.remove(file)
 
     files = glob.glob('{}/*.pkl'.format(save_dir))
     for file in files:
-        epoch_nb = int(file.split('.')[0])
+        epoch_nb = int(file.split('/')[-1].split('.')[0])
         if epoch_nb > best_epoch:
             os.remove(file)
 
