@@ -35,7 +35,7 @@ class GraphAttentionLayer(nn.Module):
 
         H_self = h.repeat(1, 1, N).view(B, N * N, -1)  # (N, nodes*nodes, features)
         H_neibor = h.repeat(1, N, 1)
-        H_corr = H_self * H_neibor
+        H_corr = (input.repeat(1, 1, N).view(B, N * N, -1) * input.repeat(1, N, 1)).matmul(self.W)
         a_input = torch.cat([H_self, H_neibor, H_corr], dim=2).view(B, N, -1, 3 * self.out_features)
         e = self.leakyrelu(torch.matmul(a_input, self.a).squeeze(3))  # attention coefficient, batch * N * N #TODO: need more layers, add h.*h
 
