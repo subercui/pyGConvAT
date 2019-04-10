@@ -14,7 +14,7 @@ import torch.optim as optim
 from torch.autograd import Variable
 
 from utils import load_data, accuracy, load_dataset
-from models import GAT, SpGAT
+from models import GAT, SpGAT, CNNBaseline
 
 # Training settings
 parser = argparse.ArgumentParser()

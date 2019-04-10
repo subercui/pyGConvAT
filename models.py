@@ -31,6 +31,29 @@ class GAT(nn.Module):
         return out
 
 
+class CNNBaseline(nn.Module):
+    def __init__(self, nfeat, nhid, nclass, dropout, alpha, nheads):
+        """Dense version of GAT."""
+        super(CNNBaseline, self).__init__()
+        self.dropout = dropout
+
+        self.conv_encoder = Conv1dGroup(out_channels=nheads)
+        enc_nfeat = self.conv_encoder.calc_out_features(in_features=nfeat)
+
+        # self.out_att = GraphAttentionLayer(nhid * nheads, nclass, dropout=dropout, alpha=alpha, concat=False)
+        self.out_layer1 = nn.Linear(in_features=enc_nfeat, out_features=10)
+        self.out_layer2 = nn.Linear(in_features=10, out_features=nclass)
+
+    def forward(self, x, adj):
+        x = F.dropout(x, self.dropout, training=self.training)
+        enc_out = self.conv_encoder(x)
+        x = F.dropout(enc_out, self.dropout, training=self.training)
+        x = F.elu(self.out_layer1(x))
+        x = self.out_layer2(x)
+        out = F.log_softmax(x, dim=-1)
+        return out
+
+
 class SpGAT(nn.Module):
     def __init__(self, nfeat, nhid, nclass, dropout, alpha, nheads):
         """Sparse version of GAT."""
