@@ -152,6 +152,7 @@ if __name__=='__main__':
     t_total = time.time()
     save_dir = time.strftime('output(%b %d %H.%M.%S %Y)')
     os.mkdir(save_dir)
+    with open('{}/settings.txt'.format(save_dir), 'w') as f: f.write(args.__str__())
     loss_values = []
     bad_counter = 0
     best = args.epochs + 1
