@@ -63,13 +63,16 @@ class BrainDecode(nn.Module):
         enc_nfeat = self.conv_encoder.calc_out_features(in_features=nfeat)
 
         # self.out_att = GraphAttentionLayer(nhid * nheads, nclass, dropout=dropout, alpha=alpha, concat=False)
-        self.out_layer1 = nn.Linear(in_features=enc_nfeat, out_features=10)
+        self.across_chan = nn.Linear(in_features=18*enc_nfeat, out_features=enc_nfeat)
+        self.out_layer1 = nn.Linear(in_features=2*enc_nfeat, out_features=10)
         self.out_layer2 = nn.Linear(in_features=10, out_features=nclass)
 
     def forward(self, x, adj):
         x = F.dropout(x, self.dropout, training=self.training)
         enc_out = self.conv_encoder(x)
         x = F.dropout(enc_out, self.dropout, training=self.training)
+        x_chan = F.elu(self.across_chan(x.view(x.size(0),1,-1))).repeat(1,18,1)  # feature across all channels
+        x = torch.cat([x, x_chan.view(x.size())], dim=-1)
         x = F.elu(self.out_layer1(x))
         x = self.out_layer2(x)
         out = F.log_softmax(x, dim=-1)
