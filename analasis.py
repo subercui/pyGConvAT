@@ -5,6 +5,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from models import GAT
+import pickle as pkl
+import os
 
 from torch.autograd import Variable
 from utils import load_data, accuracy, statics, load_dataset
@@ -69,20 +71,35 @@ def compute_test():
           "specificity= {:.4f}".format(tn/(tn+fp)),
           )
 
-def svm_run_and_test():
-    features = x_train
-    features = features.reshape(x_train.shape[0]*x_train.shape[1], -1, 12)
-    features = np.mean(features, axis=-1, keepdims=False)
-    labels = y_train.reshape(-1)
+def svm_run_and_test(load=True):
+    if load & os.path.isfile('svm_model.pkl'):
+        with open('svm_model.pkl', 'rb') as f: clf = pkl.load(f)
+        print('model loaded')
+    else:
+        features = x_train
+        features = features.reshape(x_train.shape[0]*x_train.shape[1], -1, 12)
+        features = np.mean(features, axis=-1, keepdims=False)
+        across_chan = np.mean(
+            features.reshape(x_train.shape[0],x_train.shape[1],-1),axis=1,keepdims=False
+        ).repeat(x_train.shape[1],axis=0) # across channel features
+        features = np.concatenate([features, across_chan],axis=-1)
+        labels = y_train.reshape(-1)
 
-    clf = svm.SVC(gamma='scale', class_weight='balanced')
-    clf.fit(features, labels)
-    print('svm train finished')
+        clf = svm.SVC(gamma='scale', class_weight={0:1,1:2})
+        clf.fit(features, labels)
+        print('svm train finished')
+        with open('svm_model.pkl', 'wb') as f:
+            pkl.dump(clf,f)
+            print('model saved')
 
     #test
     features = x_test
     features = features.reshape(x_test.shape[0] * x_test.shape[1], -1, 12)
     features = np.mean(features, axis=-1, keepdims=False)
+    across_chan = np.mean(
+        features.reshape(x_test.shape[0], x_test.shape[1], -1), axis=1, keepdims=False
+    ).repeat(x_test.shape[1], axis=0)  # across channel features
+    features = np.concatenate([features, across_chan], axis=-1)
     labels = y_test.reshape(-1)
     output = clf.predict(features)
     preds = output
@@ -124,7 +141,7 @@ if __name__ == '__main__':
     print('model loaded')
 
     # Testing
-    mode = 'svm'  # define which test to run: GADN, svm, run_record
+    mode = 'svm'  # define which test to run: GADN, svm, run_record, cut_channel_GADN, cut_channel_svm
     if mode == 'GADN':
         compute_test()
     elif mode == 'svm':
