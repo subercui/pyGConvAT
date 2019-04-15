@@ -4,7 +4,7 @@ import random
 import numpy as np
 import torch
 import torch.nn.functional as F
-from models import GAT
+from models import GAT, CNNBaseline
 import pickle as pkl
 import os
 
@@ -39,10 +39,6 @@ if args.cuda:
 
 tsne = manifold.TSNE
 
-def TF():
-    """true positive"""
-    return
-
 def run_EEG_record():
     """test on a record trial"""
     return
@@ -51,7 +47,7 @@ def attention_graph():
     """draw the graph map based on the attention index"""
     return
 
-def compute_test():
+def compute_test(x_test, y_test):
     features = Variable(torch.FloatTensor(x_test))
     adj = Variable(torch.FloatTensor(np.ones([features.shape[0], features.shape[1], features.shape[1]])))
     labels = Variable(torch.LongTensor(y_test))
@@ -70,6 +66,7 @@ def compute_test():
           "sensitivity= {:.4f}".format(tp/(tp+fn)),
           "specificity= {:.4f}".format(tn/(tn+fp)),
           )
+    return tp/(tp+fn)
 
 def svm_run_and_test(load=True):
     if load & os.path.isfile('svm_model.pkl'):
@@ -116,6 +113,23 @@ def svm_run_and_test(load=True):
           )
     return clf
 
+def cut_chan(num, x_test, y_test, cut_class=1):
+    x_test_cut = np.asarray(x_test)
+    y_test_cut = np.asarray(y_test)
+    for i in range(num):
+        idx_1 = y_test[:, i] == cut_class
+        y_test_cut[idx_1, i] = 0
+        x_test_cut[idx_1, i, :] = 0.0
+    return x_test_cut, y_test_cut
+
+
+def cut_chan_test(mode='GADN'):
+    sensits = []
+    for i in range(10):
+        x_test_cut, y_test_cut = cut_chan(i, x_test, y_test)
+        sensits.append(compute_test(x_test_cut,y_test_cut))
+    print(sensits)
+
 if __name__ == '__main__':
     # Load data
     X, Y = load_dataset(args.seed)
@@ -125,10 +139,6 @@ if __name__ == '__main__':
 
     y_train = Y[0:int(split_rate * Y.shape[0])]
     y_test = Y[int(split_rate * Y.shape[0]):]
-
-    features = Variable(torch.FloatTensor(x_train[0]))
-    adj = Variable(torch.FloatTensor(np.ones([features.shape[0], features.shape[0]])))
-    labels = Variable(torch.LongTensor(y_train[0]))
 
     # Restore best model
     model = GAT(nfeat=120,
@@ -141,8 +151,10 @@ if __name__ == '__main__':
     print('model loaded')
 
     # Testing
-    mode = 'svm'  # define which test to run: GADN, svm, run_record, cut_channel_GADN, cut_channel_svm
+    mode = 'cut_channel_GADN'  # define which test to run: GADN, svm, run_record, cut_channel_GADN, cut_channel_svm
     if mode == 'GADN':
-        compute_test()
+        compute_test(x_test, y_test)
+    elif mode == 'cut_channel_GADN':
+        cut_chan_test(mode='GADN')
     elif mode == 'svm':
         clf = svm_run_and_test()
