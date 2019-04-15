@@ -58,53 +58,37 @@ class GraphAttentionLayer(nn.Module):
         return self.__class__.__name__ + ' (' + str(self.in_features) + ' -> ' + str(self.out_features) + ')'
 
 
-class GraphAttentionLayer_NoBatch(nn.Module):
-    """
-    Simple GAT layer, similar to https://arxiv.org/abs/1710.10903
-    """
+class BrainDecodeConv(nn.Module):
+    """similar implementation of the braindecode network but for this spike detection task"""
+    def __init__(self, out_channels=8):
+        super(BrainDecodeConv, self).__init__()
+        c_out = out_channels
+        self.conv1 = nn.Conv1d(in_channels=1, out_channels=c_out, kernel_size=10, stride=2, dilation=1)
+        self.c_out = c_out
 
-    def __init__(self, in_features, out_features, dropout, alpha, concat=True, Wb=True):
-        super(GraphAttentionLayer_NoBatch, self).__init__()
-        self.dropout = dropout
-        self.in_features = in_features
-        self.out_features = out_features
-        self.alpha = alpha
-        self.concat = concat
+    def calc_out_features(self, in_features):
+        out1_feaures = int(np.floor((in_features-10)/2 + 1))
+        out2_features = int(np.floor((out1_feaures-3)/3 + 1))
+        out_features = self.c_out * (out2_features)
+        return out_features
 
-        self.W = nn.Parameter(torch.zeros(size=(in_features, out_features)))  # important - Parameter() add vector to back prop
-        nn.init.xavier_uniform_(self.W.data, gain=1.414)
-        self.a = nn.Parameter(torch.zeros(size=(2*out_features, 1)))
-        nn.init.xavier_uniform_(self.a.data, gain=1.414)
-        self.IF_Wb = Wb
-        if self.IF_Wb:
-            self.encoder = nn.Linear(in_features=in_features, out_features=out_features)
+    def forward(self, x):
+        """
+                x: (b_s, len, embsize)
+                """
+        assert x.dim() == 3  # (batch, channels, features)
+        batch, channels = x.size(0), x.size(1)
+        x = x.view(batch * channels, 1, x.size(2))  # (batch*channels, 1, features)
 
-        self.leakyrelu = nn.LeakyReLU(self.alpha)
+        # conv
+        out1 = F.relu(self.conv1(x))  # (batch*chanels, c_out, features1)
+        out2 = F.max_pool1d(out1, kernel_size=3)
 
-    def forward(self, input, adj):
-        h = torch.mm(input, self.W)  # nodes * features
-        N = h.size()[0]  # nodes
+        # concatenate conv outputs
+        out = out2.view(batch * channels, -1)  # (batch*chanels, features)
+        out = out.view(batch, channels, out.size(1))
 
-        H_self = h.repeat(1, N).view(N * N, -1)  # (nodes, nodes, features)
-        H_neibor = h.repeat(N, 1)
-        H_corr = H_self * H_neibor
-        a_input = torch.cat([H_self, H_neibor, H_corr], dim=1).view(N, -1, 2 * self.out_features)
-        e = self.leakyrelu(torch.matmul(a_input, self.a).squeeze(2))  # attention coefficient, N * N
-
-        zero_vec = -9e15*torch.ones_like(e)
-        attention = torch.where(adj > 0, e, zero_vec)
-        attention = F.softmax(attention, dim=1)
-        attention = F.dropout(attention, self.dropout, training=self.training)  # N * N
-        h_ = self.encoder(input)  # encode with a different W
-        h_prime = torch.matmul(attention, h_)  # N * features
-
-        if self.concat:
-            return F.elu(h_prime)
-        else:
-            return h_prime
-
-    def __repr__(self):
-        return self.__class__.__name__ + ' (' + str(self.in_features) + ' -> ' + str(self.out_features) + ')'
+        return out
 
 
 class Conv1dGroup(nn.Module):

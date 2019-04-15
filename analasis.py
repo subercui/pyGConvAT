@@ -1,4 +1,4 @@
-from sklearn import manifold, datasets
+from sklearn import manifold, svm, datasets
 import argparse
 import random
 import numpy as np
@@ -69,6 +69,35 @@ def compute_test():
           "specificity= {:.4f}".format(tn/(tn+fp)),
           )
 
+def svm_run_and_test():
+    features = x_train
+    features = features.reshape(x_train.shape[0]*x_train.shape[1], -1, 12)
+    features = np.mean(features, axis=-1, keepdims=False)
+    labels = y_train.reshape(-1)
+
+    clf = svm.SVC(gamma='scale', class_weight='balanced')
+    clf.fit(features, labels)
+    print('svm train finished')
+
+    #test
+    features = x_test
+    features = features.reshape(x_test.shape[0] * x_test.shape[1], -1, 12)
+    features = np.mean(features, axis=-1, keepdims=False)
+    labels = y_test.reshape(-1)
+    output = clf.predict(features)
+    preds = output
+    correct = np.equal(preds, labels)
+    tp = correct * preds
+    tn = correct * (1 - preds)
+    fp = (1 - correct) * preds
+    fn = (1 - correct) * (1 - preds)
+    tp, tn, fp, fn = tp.sum(), tn.sum(), fp.sum(), fn.sum()
+    print("Test set results:",
+          "accuracy= {:.4f}".format((tp + tn) / (tp + fp + tn + fn)),
+          "sensitivity= {:.4f}".format(tp / (tp + fn)),
+          "specificity= {:.4f}".format(tn / (tn + fp)),
+          )
+    return clf
 
 if __name__ == '__main__':
     # Load data
@@ -95,4 +124,8 @@ if __name__ == '__main__':
     print('model loaded')
 
     # Testing
-    compute_test()
+    mode = 'svm'  # define which test to run: GADN, svm, run_record
+    if mode == 'GADN':
+        compute_test()
+    elif mode == 'svm':
+        clf = svm_run_and_test()
