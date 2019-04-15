@@ -89,3 +89,14 @@ def accuracy(output, labels):
     correct = correct.sum()
     return correct / len(labels)
 
+def statics(output, labels):
+    """compute true positive, true negative, false positive, false negative"""
+    preds = output.max(1)[1].type_as(labels)
+    correct = preds.eq(labels).double()
+    tp = correct.numpy() * preds.numpy()
+    tn = correct.numpy() * (1-preds.numpy())
+    fp = (1-correct.numpy()) * preds.numpy()
+    fn = (1-correct.numpy()) * (1-preds.numpy())
+    tp, tn, fp, fn = tp.sum(), tn.sum(), fp.sum(), fn.sum()
+    return tp, tn, fp, fn
+

@@ -13,7 +13,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.autograd import Variable
 
-from utils import load_data, accuracy, load_dataset
+from utils import load_data, accuracy, statics, load_dataset
 from models import GAT, SpGAT, CNNBaseline
 
 # Training settings
@@ -97,13 +97,22 @@ def train(epoch):
 
 
 def compute_test():
+    features = Variable(torch.FloatTensor(x_test))
+    adj = Variable(torch.FloatTensor(np.ones([features.shape[0], features.shape[1], features.shape[1]])))
+    labels = Variable(torch.LongTensor(y_test))
+
     model.eval()
     output = model(features, adj)
-    loss_test = F.nll_loss(output[idx_test], labels[idx_test])
-    acc_test = accuracy(output[idx_test], labels[idx_test])
+    output = output.view(-1, 2)
+    labels = labels.view(-1)
+    loss_test = F.nll_loss(output, labels)
+    tp, tn, fp, fn = statics(output, labels)
     print("Test set results:",
           "loss= {:.4f}".format(loss_test.data[0]),
-          "accuracy= {:.4f}".format(acc_test.data[0]))
+          "accuracy= {:.4f}".format((tp + tn) / (tp + fp + tn + fn)),
+          "sensitivity= {:.4f}".format(tp / (tp + fn)),
+          "specificity= {:.4f}".format(tn / (tn + fp)),
+          )
 
 if __name__=='__main__':
     # Load data
