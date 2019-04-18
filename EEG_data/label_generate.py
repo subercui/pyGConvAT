@@ -46,7 +46,7 @@ file_list = ["DA0570A0_1-1+.edf",
              "DA10104F_1-1+.edf", "DA10104G_1-1+.edf", "DA10104H_1-1+.edf", "DA10104I_1-1+.edf",
              "DA10104J_1-1+.edf", "DA101049_1-1+.edf"]
 
-             # DA10104A_1 is OK; DA05709R_1-1+.edf SOZ is on C4 F8; DA0570A6 is suitable for graph analysis
+             # DA10104A_1 is OK; DA05709R_1-1+.edf SOZ is on C4 F8; DA0570A6 is suitable for graph analysis, SOZ is on T3, T5, (F3, C3)
              # Delete noisy data: "DA0570A1_1-1+.edf",[5], DA10104B_1-1+.edf [4],No label data: "DA0570A2_1-1+.edf",[3], "DA0570A3_1-1+.edf",[], loss label data: DA05709R_1-1+.edf [3], DA10104C_1-1+.edf,[3,4],
 
 annotation_list = [[4], [3], [3], [4], [3], [4], [3], [3,4],

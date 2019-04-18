@@ -1,4 +1,5 @@
 from sklearn import manifold, svm, datasets
+import matplotlib.pyplot as plt
 import argparse
 import random
 import numpy as np
@@ -7,9 +8,10 @@ import torch.nn.functional as F
 from models import GAT, CNNBaseline
 import pickle as pkl
 import os
+import mne
 
 from torch.autograd import Variable
-from utils import load_data, accuracy, statics, load_dataset
+from utils import load_data, accuracy, statics, load_dataset, raw_eeg_pick, normalization
 
 # Training settings
 parser = argparse.ArgumentParser()
@@ -39,12 +41,90 @@ if args.cuda:
 
 tsne = manifold.TSNE
 
-def run_EEG_record():
+def run_EEG_record(model, file='EEG_data/DA0570A6_1-1+.edf'):
     """test on a record trial"""
+    raw = mne.io.read_raw_edf(file, preload=True)
+    raw = raw_eeg_pick(raw)  # now only EEG channels
+
+    x = get_data(raw)  # (batch, chans, features)
+
+    # run model
+    features = Variable(torch.FloatTensor(x))
+    adj = Variable(torch.FloatTensor(np.ones([features.shape[0], features.shape[1], features.shape[1]])))
+
+    model.eval()
+    output, attentions = model.forward2(features, adj)
+    output = output.view(-1, 2)
+    preds = output.max(1)[1].view(attentions.size(0),attentions.size(1)).data.numpy()
+    attentions = attentions.data.numpy()
+
+    # select attentions
+    idx_1 = (preds.sum(axis=-1) > 0)
+    attentions = attentions[idx_1,:,:,:]  # (66, 18, 18, 4)
+    attentions = np.mean(attentions, axis=0)  # (18, 18, 4)
+    attentions = np.concatenate([attentions, attentions.mean(axis=-1, keepdims=True)], axis=-1)
+
+    # draw attention graph
+    #TODO: need to draw every channels' graph, and a combined one
+    for i in range(5):  # 5 graphs
+        distance = to_symetric(attentions[:,:,i])
+        # # MDS
+        # mds = manifold.MDS(n_components=2, max_iter=3000, eps=1e-9, #random_state=seed,
+        #                    dissimilarity="precomputed", n_jobs=1)
+        # pos = mds.fit_transform(distance)
+        # attention_graph(pos, title='MDS, Attention Head {}'.format(i))
+        # t-sne
+        tsne = manifold.TSNE(n_components=2, perplexity=5,  # random_state=seed,
+                           metric="precomputed")
+        pos = tsne.fit_transform(distance)
+        attention_graph(pos, title='t-sne, Attention Head {}'.format(i))
     return
 
-def attention_graph():
+
+def to_symetric(mat):
+    mat = 1/2 * (mat + mat.transpose())
+    diag = np.eye(mat.shape[0])
+    mat = mat * (1 - diag)
+    return mat
+
+def get_data(raw):
+    data = raw.set_eeg_reference(ref_channels=['A1', 'A2']).notch_filter(
+        freqs=50).filter(3, 70).resample(sfreq=200).drop_channels(['A1', 'A2']).get_data().clip(-0.0001, 0.0001)[None,
+           :, :]
+    ch_names = raw.info["ch_names"]
+    sfreq = raw.info["sfreq"]
+
+    # cut window
+    x = []
+    win_size = 0.6
+    win_slide = 0.1
+    for i in range(0, data.shape[2] - int(win_size * sfreq), int(win_slide*sfreq)):
+        start_point = i
+        end_point = i + int(win_size * sfreq)
+        x.append(normalization(data[:, :, start_point: end_point]))
+    x = np.concatenate(x, 0).astype(np.float32)
+
+    return x
+
+def attention_graph(X, title=None):
     """draw the graph map based on the attention index"""
+    x_min, x_max = np.min(X, 0), np.max(X, 0)
+    X = (X - x_min) / (x_max - x_min)
+    y = ['Fp1', 'Fp2', 'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'O1',
+         'O2', 'F7', 'F8', 'T3', 'T4', 'T5', 'T6', 'Fz', 'Pz']
+
+    plt.figure()
+    ax = plt.subplot(111)
+    for i in range(X.shape[0]):
+        plt.text(X[i, 0], X[i, 1], str(y[i]),
+                 color='red' if y[i] in ['T3', 'T5', 'F3', 'C3'] else 'blue',
+                 fontdict={'weight': 'bold', 'size': 9})
+
+    plt.xticks([]), plt.yticks([])
+    if title is not None:
+        plt.title(title)
+    plt.show()
+
     return
 
 def compute_test(x_test, y_test):
@@ -67,6 +147,39 @@ def compute_test(x_test, y_test):
           "specificity= {:.4f}".format(tn/(tn+fp)),
           )
     return tp/(tp+fn)
+
+
+def plot_chan_exp():
+    GADN0 = np.array(
+        [0.7318485523385301, 0.7483296213808464, 0.7701559020044544, 0.7790645879732739, 0.7946547884187083,
+         0.8089086859688196, 0.8267260579064588, 0.8485523385300668, 0.866815144766147, 0.8948775055679288])
+    GADN_Conv0 = np.array(
+        [0.6552338530066815, 0.6552338530066815, 0.6552338530066815, 0.6552338530066815, 0.6552338530066815,
+         0.6552338530066815, 0.6552338530066815, 0.6552338530066815, 0.6552338530066815, 0.6552338530066815])
+    GADN1 = np.array(
+        [0.7318485523385301, 0.7548693586698337, 0.7597736625514403, 0.7700626067159931, 0.7790332705586943,
+         0.7945682451253482, 0.8006379585326954, 0.8061485909479078, 0.7831207065750736, 0.7900101936799184])
+    GADN_Conv1 = np.array(
+        [0.6552338530066815, 0.6717339667458432, 0.6712962962962963, 0.6881047239612976, 0.6949152542372882,
+         0.6942896935933147, 0.7073365231259968, 0.6994022203245089, 0.6712463199214916, 0.6768603465851172])
+
+    plt.figure()
+    plt.axes(xlabel='channel delete num', ylabel='sensitivity')
+    plt.plot(GADN0,label='GADN')
+    plt.plot(GADN_Conv0, label='GADN_OnlyConv')
+    plt.title('Delete background channels')
+    plt.xticks(range(10))
+    plt.legend()
+
+    plt.figure()
+    plt.axes(xlabel='channel delete num', ylabel='sensitivity')
+    plt.plot(GADN1, label='GADN')
+    plt.plot(GADN_Conv1, label='GADN_OnlyConv')
+    plt.title('Delete spike channels')
+    plt.xticks(range(10))
+    plt.legend()
+    plt.show()
+    return
 
 def svm_run_and_test(load=True):
     if load & os.path.isfile('svm_model.pkl'):
@@ -113,7 +226,7 @@ def svm_run_and_test(load=True):
           )
     return clf
 
-def cut_chan(num, x_test, y_test, cut_class=1):
+def cut_chan(num, x_test, y_test, cut_class=0):
     x_test_cut = np.asarray(x_test)
     y_test_cut = np.asarray(y_test)
     for i in range(num):
@@ -151,10 +264,14 @@ if __name__ == '__main__':
     print('model loaded')
 
     # Testing
-    mode = 'cut_channel_GADN'  # define which test to run: GADN, svm, run_record, cut_channel_GADN, cut_channel_svm
+    mode = 'GADN'  # define which test to run: GADN, svm, run_record, cut_channel_GADN, cut_channel_svm
     if mode == 'GADN':
         compute_test(x_test, y_test)
     elif mode == 'cut_channel_GADN':
         cut_chan_test(mode='GADN')
     elif mode == 'svm':
         clf = svm_run_and_test()
+    elif mode == 'run_record':
+        run_EEG_record(model)
+
+    plot_chan_exp()

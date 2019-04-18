@@ -30,6 +30,17 @@ class GAT(nn.Module):
         out = F.log_softmax(x, dim=-1)
         return out
 
+    def forward2(self, x, adj):
+        x = F.dropout(x, self.dropout, training=self.training)
+        enc_out = self.conv_encoder(x)
+        x = torch.cat([att(enc_out, adj) for att in self.attentions], dim=-1)
+        attents = torch.stack([att.forward2(enc_out, adj) for att in self.attentions], dim=-1)  # (batch, N, N, n_heads)
+        x = F.dropout(x, self.dropout, training=self.training)
+        x = F.elu(self.out_layer1(x))
+        x = self.out_layer2(x)
+        out = F.log_softmax(x, dim=-1)  # (batch, N, class)
+        return out, attents
+
 
 class CNNBaseline(nn.Module):
     def __init__(self, nfeat, nhid, nclass, dropout, alpha, nheads):

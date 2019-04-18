@@ -54,6 +54,23 @@ class GraphAttentionLayer(nn.Module):
         else:
             return h_prime
 
+    def forward2(self, input, adj):
+        # h = torch.mm(input, self.W)  # nodes * features
+        B = input.size(0)
+        h = input.matmul(self.W)  # batch * nodes * features
+        N = h.size()[1]  # nodes
+
+        H_self = h.repeat(1, 1, N).view(B, N * N, -1)  # (N, nodes*nodes, features)
+        H_neibor = h.repeat(1, N, 1)
+        H_corr = H_self * H_neibor
+        a_input = torch.cat([H_self, H_neibor, H_corr], dim=2).view(B, N, -1, 3 * self.out_features)
+        e = self.leakyrelu(torch.matmul(a_input, self.a).squeeze(3))  # attention coefficient, batch * N * N #TODO: need more layers, add h.*h
+
+        zero_vec = -9e15*torch.ones_like(e)
+        attention = torch.where(adj > 0, e, zero_vec)
+        attention = F.softmax(attention, dim=-1)  # (batch, N, N)
+        return attention
+
     def __repr__(self):
         return self.__class__.__name__ + ' (' + str(self.in_features) + ' -> ' + str(self.out_features) + ')'
 

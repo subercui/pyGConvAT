@@ -2,6 +2,28 @@ import numpy as np
 import scipy.sparse as sp
 import torch
 
+def raw_eeg_pick(raw):
+    ch_names = raw.info["ch_names"]
+    drop_ch_list = []
+    marker_list = ['T1', 'T2', 'STI', 'EMG', 'ECG', 'X', 'DC', 'Pulse', 'Wave', 'Mark', 'Sp', 'SP', 'EtCO', 'E', 'Cz']
+    # For some trials, Cz is problematic#
+    for ch_name in ch_names:
+        for marker in marker_list:
+            if marker in ch_name:
+                drop_ch_list.append(ch_name)
+                break
+    raw.drop_channels(drop_ch_list)
+    return raw
+
+def normalization(data):
+    # subercui: should not minus mean again here
+    # for i in range(data.shape[1]):
+    #     mean = np.mean(data[0,i,:])
+    #     data[0,i,:] = data[0,i,:] - mean
+    normalizer = 0.0001
+    data = data / normalizer
+    data = data / np.std(data)
+    return data
 
 def encode_onehot(labels):
     classes = set(labels)
