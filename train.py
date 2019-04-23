@@ -14,7 +14,7 @@ import torch.optim as optim
 from torch.autograd import Variable
 
 from utils import load_data, accuracy, statics, load_dataset
-from models import GAT, SpGAT, CNNBaseline
+from models import GAT, SpGAT, CNNBaseline, BrainDecode
 
 # Training settings
 parser = argparse.ArgumentParser()
@@ -159,7 +159,7 @@ if __name__=='__main__':
 
     # Train model
     t_total = time.time()
-    save_dir = time.strftime('output(%b %d %H.%M.%S %Y)')
+    save_dir = time.strftime('GAT(%b %d %H.%M.%S %Y)')
     os.mkdir(save_dir)
     with open('{}/settings.txt'.format(save_dir), 'w') as f: f.write(args.__str__())
     loss_values = []
@@ -183,13 +183,13 @@ if __name__=='__main__':
 
         files = glob.glob('{}/*.pkl'.format(save_dir))
         for file in files:
-            epoch_nb = int(file.split('/')[-1].split('.')[0])
+            epoch_nb = int(os.path.split(file)[-1].split('.')[0])
             if epoch_nb < best_epoch:
                 os.remove(file)
 
     files = glob.glob('{}/*.pkl'.format(save_dir))
     for file in files:
-        epoch_nb = int(file.split('/')[-1].split('.')[0])
+        epoch_nb = int(os.path.split(file)[-1].split('.')[0])
         if epoch_nb > best_epoch:
             os.remove(file)
 
