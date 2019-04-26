@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from layers import GraphAttentionLayer, SpGraphAttentionLayer, Conv1dGroup, BrainDecodeConv
+from layers import GraphAttentionLayer, SpGraphAttentionLayer, GraphConvAttentLayer, Conv1dGroup, BrainDecodeConv
 
 
 class GAT(nn.Module):
@@ -59,6 +59,33 @@ class CNNBaseline(nn.Module):
         x = F.dropout(x, self.dropout, training=self.training)
         enc_out = self.conv_encoder(x)
         x = F.dropout(enc_out, self.dropout, training=self.training)
+        x = F.elu(self.out_layer1(x))
+        x = self.out_layer2(x)
+        out = F.log_softmax(x, dim=-1)
+        return out
+
+
+class GConvAT(nn.Module):
+    def __init__(self, nfeat, nhid, nclass, dropout, alpha, nheads):
+        """Dense version of GConvAT."""
+        super(GConvAT, self).__init__()
+        self.dropout = dropout
+
+        self.conv_encoder = Conv1dGroup(out_channels=nheads)
+        enc_nfeat = self.conv_encoder.calc_out_features(in_features=nfeat)
+        self.attentions = [GraphConvAttentLayer(enc_nfeat, nhid, dropout=dropout, alpha=alpha, concat=True) for _ in range(nheads)]
+        for i, attention in enumerate(self.attentions):
+            self.add_module('attention_{}'.format(i), attention)  # important add to graph
+
+        # self.out_att = GraphAttentionLayer(nhid * nheads, nclass, dropout=dropout, alpha=alpha, concat=False)
+        self.out_layer1 = nn.Linear(in_features=nhid * nheads, out_features=10)
+        self.out_layer2 = nn.Linear(in_features=10, out_features=nclass)
+
+    def forward(self, x, adj):
+        x = F.dropout(x, self.dropout, training=self.training)
+        enc_out = self.conv_encoder(x)
+        x = torch.cat([att(enc_out, adj) for att in self.attentions], dim=-1)
+        x = F.dropout(x, self.dropout, training=self.training)
         x = F.elu(self.out_layer1(x))
         x = self.out_layer2(x)
         out = F.log_softmax(x, dim=-1)

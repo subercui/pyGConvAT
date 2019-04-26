@@ -108,6 +108,77 @@ class BrainDecodeConv(nn.Module):
         return out
 
 
+class GraphConvAttentLayer(nn.Module):
+    """
+    Graph Convolutional AT layer
+    """
+
+    def __init__(self, in_features, out_features, dropout, alpha, c_out=4, roll=False, concat=True):
+        # TODO: temperally set roll to False; it is useful to represent phase difference
+        super(GraphConvAttentLayer, self).__init__()
+        self.dropout = dropout
+        self.in_features = in_features
+        self.out_features = out_features
+        self.alpha = alpha
+        self.roll = roll
+        self.concat = concat
+
+        self.conv1 = nn.Conv2d(in_channels=1, out_channels=c_out, kernel_size=(5, 2))
+        self.conv2 = nn.Conv2d(in_channels=c_out, out_channels=c_out, kernel_size=(5, 1))
+        def calc_out_features():
+            out1_feaures = int(np.floor((in_features - 5) / 1 + 1))
+            out1_feaures = int(np.floor((out1_feaures-2) / 2 + 1))
+            out2_features = int(np.floor((out1_feaures - 5) / 1 + 1))
+            out2_features = int(np.floor((out2_features - 2) / 2 + 1))
+            out_features = c_out * out2_features
+            return out_features
+        conv_nfeat = calc_out_features()
+
+        self.W = nn.Parameter(torch.zeros(size=(in_features, out_features)))  # important - Parameter() add vector to back prop
+        nn.init.xavier_uniform_(self.W.data, gain=1.414)
+        self.a = nn.Parameter(torch.zeros(size=(conv_nfeat, 1)))
+        nn.init.xavier_uniform_(self.a.data, gain=1.414)
+        self.W_b = nn.Parameter(torch.zeros(size=(in_features, out_features)))
+        nn.init.xavier_uniform_(self.W_b.data, gain=1.414)
+
+        self.leakyrelu = nn.LeakyReLU(self.alpha)
+
+    def forward(self, input, adj):
+        B = input.size(0)
+        h = input
+        N = h.size()[1]  # nodes
+
+        H_self = h.repeat(1, 1, N).view(B, N * N, -1)  # (batch, nodes*nodes, features) the 1st row is node 0, the 2nd row is node 0
+        H_neibor = h.repeat(1, N, 1)  # (batch, nodes*nodes, features) the 1st row is node 0, the 2nd row is node 1
+        a_input = torch.stack([H_self, H_neibor], dim=-1)  # (batch, nodes*nodes, features, 2)
+
+        # conv & linear -> attention e
+        a_input = F.elu(self.conv1(a_input.view(B*N*N, 1, a_input.size(2), 2)))  # (batch*nodes*nodes, c_out, features, 1)
+        a_input = nn.MaxPool2d((2, 1))(a_input)
+        a_input = F.elu(self.conv2(a_input))  # (batch*nodes*nodes, c_out, features, 1) #TODO:check this step if it is that the 1st row is node 0, the 2nd row is node 0
+        a_input = nn.MaxPool2d((2, 1))(a_input)
+        a_input = a_input.squeeze(3).view(B, N, N, -1)  # (batch, nodes, nodes, features)
+        e = self.leakyrelu(torch.matmul(a_input, self.a).squeeze(3))  # attention coefficient, (batch, nodes, nodes)
+
+        zero_vec = -9e15*torch.ones_like(e)
+        attention = torch.where(adj > 0, e, zero_vec)
+        attention = F.softmax(attention, dim=-1)
+        attention = F.dropout(attention, self.dropout, training=self.training)  # N * N, attention[0][1] sums to 1.
+        if self.roll:
+            pass
+        else:
+            h_ = input.matmul(self.W_b)  # batch * nodes * features
+            h_prime = torch.matmul(attention, h_)  # (batch, nodes, features)
+
+        if self.concat:
+            return F.elu(h_prime)
+        else:
+            return h_prime
+
+    def __repr__(self):
+        return self.__class__.__name__ + ' (' + str(self.in_features) + ' -> ' + str(self.out_features) + ')'
+
+
 class Conv1dGroup(nn.Module):
     """
     A group of 3 layer 1d conv layers

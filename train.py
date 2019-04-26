@@ -14,7 +14,7 @@ import torch.optim as optim
 from torch.autograd import Variable
 
 from utils import load_data, accuracy, statics, load_dataset
-from models import GAT, SpGAT, CNNBaseline, BrainDecode
+from models import GAT, SpGAT, GConvAT, CNNBaseline, BrainDecode
 
 # Training settings
 parser = argparse.ArgumentParser()
@@ -138,7 +138,7 @@ if __name__=='__main__':
                     nheads=args.nb_heads,
                     alpha=args.alpha)
     else:
-        model = GAT(nfeat=features.shape[1],
+        model = GConvAT(nfeat=features.shape[1],
                     nhid=args.hidden,
                     nclass=int(y_train.max()) + 1,
                     dropout=args.dropout,
@@ -159,7 +159,7 @@ if __name__=='__main__':
 
     # Train model
     t_total = time.time()
-    save_dir = time.strftime('GAT(%b %d %H.%M.%S %Y)')
+    save_dir = time.strftime('GConvAT(%b %d %H.%M.%S %Y)')
     os.mkdir(save_dir)
     with open('{}/settings.txt'.format(save_dir), 'w') as f: f.write(args.__str__())
     loss_values = []
