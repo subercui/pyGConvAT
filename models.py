@@ -72,6 +72,7 @@ class GConvAT(nn.Module):
         self.dropout = dropout
 
         self.conv_encoder = Conv1dGroup(out_channels=nheads)
+        self.add_module('conv_encoder', self.conv_encoder)
         enc_nfeat = self.conv_encoder.calc_out_features(in_features=nfeat)
         self.attentions = [GraphConvAttentLayer(enc_nfeat, nhid, dropout=dropout, alpha=alpha, concat=True) for _ in range(nheads)]
         for i, attention in enumerate(self.attentions):

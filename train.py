@@ -40,6 +40,10 @@ np.random.seed(args.seed)
 torch.manual_seed(args.seed)
 if args.cuda:
     torch.cuda.manual_seed(args.seed)
+    args.device = torch.device('cuda:3')
+    torch.cuda.set_device(3)
+else:
+    args.device = torch.device('cpu')
 
 
 def train(epoch):
@@ -49,9 +53,9 @@ def train(epoch):
     t = time.time()
     model.train()
     for idx in range(0, len(x_train), batch):
-        features = Variable(torch.FloatTensor(x_train[idx:idx+batch]))
-        adj = Variable(torch.FloatTensor(np.ones([features.shape[0], features.shape[1], features.shape[1]])))
-        labels = Variable(torch.LongTensor(y_train[idx:idx+batch]))
+        features = Variable(torch.FloatTensor(x_train[idx:idx+batch])).to(args.device)
+        adj = Variable(torch.FloatTensor(np.ones([features.shape[0], features.shape[1], features.shape[1]]))).to(args.device)
+        labels = Variable(torch.LongTensor(y_train[idx:idx+batch])).to(args.device)
         optimizer.zero_grad()
         # forward
         output = model(features, adj)
@@ -61,27 +65,32 @@ def train(epoch):
 
         # backward
         loss_train = F.nll_loss(output, labels)
-        loss_epoch.append(loss_train.data[0])
+        loss_epoch.append(loss_train.data.item())
         acc_train = accuracy(output, labels)
         loss_train.backward()
         optimizer.step()
         if int(idx/batch) % 10 ==0:  # print log per 10 batches
             print(
                 'Batch {:d}'.format(int(idx/batch)+1),
-                'loss_train: {:.4f}'.format(loss_train.data[0]),
-                'acc_train: {:.4f}'.format(acc_train.data[0]),
+                'loss_train: {:.4f}'.format(loss_train.data.item()),
+                'acc_train: {:.4f}'.format(acc_train.data.item()),
             )
 
     # test
-    features = Variable(torch.FloatTensor(x_test))
-    adj = Variable(torch.FloatTensor(np.ones([features.shape[0], features.shape[1], features.shape[1]])))
-    labels = Variable(torch.LongTensor(y_test))
+    features = Variable(torch.FloatTensor(x_test)).to(args.device)
+    adj = Variable(torch.FloatTensor(np.ones([features.shape[0], features.shape[1], features.shape[1]]))).to(args.device)
+    labels = Variable(torch.LongTensor(y_test)).to(args.device)
 
     if not args.fastmode:
         # Evaluate validation set performance separately,
         # deactivates dropout during validation run.
         model.eval()
-        output = model(features, adj)
+        output = []
+        for idx in range(0, len(x_train), batch):
+            features_ = features[idx:idx+batch]
+            adj_ = adj[idx:idx+batch]
+            output.append(model(features_, adj_))
+        output = torch.cat(output, dim=0)
 
     output = output.view(-1, 2)
     labels = labels.view(-1)
@@ -89,17 +98,17 @@ def train(epoch):
     acc_val = accuracy(output, labels)
     print('Epoch: {:04d}'.format(epoch+1),
           'loss_train: {:.4f}'.format(np.mean(np.array(loss_epoch))),
-          '-- loss_val: {:.4f}'.format(loss_val.data[0]),
-          'acc_val: {:.4f}'.format(acc_val.data[0]),
+          '-- loss_val: {:.4f}'.format(loss_val.data.item()),
+          'acc_val: {:.4f}'.format(acc_val.data.item()),
           'time: {:.4f}s'.format(time.time() - t))
 
-    return -acc_val.data[0]
+    return -acc_val.data.item()
 
 
 def compute_test():
-    features = Variable(torch.FloatTensor(x_test))
-    adj = Variable(torch.FloatTensor(np.ones([features.shape[0], features.shape[1], features.shape[1]])))
-    labels = Variable(torch.LongTensor(y_test))
+    features = Variable(torch.FloatTensor(x_test)).to(args.device)
+    adj = Variable(torch.FloatTensor(np.ones([features.shape[0], features.shape[1], features.shape[1]]))).to(args.device)
+    labels = Variable(torch.LongTensor(y_test)).to(args.device)
 
     model.eval()
     output = model(features, adj)
@@ -108,7 +117,7 @@ def compute_test():
     loss_test = F.nll_loss(output, labels)
     tp, tn, fp, fn = statics(output, labels)
     print("Test set results:",
-          "loss= {:.4f}".format(loss_test.data[0]),
+          "loss= {:.4f}".format(loss_test.data.item()),
           "accuracy= {:.4f}".format((tp + tn) / (tp + fp + tn + fn)),
           "sensitivity= {:.4f}".format(tp / (tp + fn)),
           "specificity= {:.4f}".format(tn / (tn + fp)),
@@ -124,9 +133,9 @@ if __name__=='__main__':
     y_train = Y[0:int(split_rate * Y.shape[0])]
     y_test = Y[int(split_rate * Y.shape[0]):]
 
-    features = Variable(torch.FloatTensor(x_train[0]))
-    adj = Variable(torch.FloatTensor(np.ones([features.shape[0],features.shape[0]])))
-    labels = Variable(torch.LongTensor(y_train[0]))
+    features = Variable(torch.FloatTensor(x_train[0])).to(args.device)
+    adj = Variable(torch.FloatTensor(np.ones([features.shape[0],features.shape[0]]))).to(args.device)
+    labels = Variable(torch.LongTensor(y_train[0])).to(args.device)
 
 
     # Model and optimizer
@@ -150,12 +159,6 @@ if __name__=='__main__':
 
     if args.cuda:
         model.cuda()
-        features = features.cuda()
-        adj = adj.cuda()
-        labels = labels.cuda()
-        # idx_train = idx_train.cuda()
-        # idx_val = idx_val.cuda()
-        # idx_test = idx_test.cuda()
 
     # Train model
     t_total = time.time()
