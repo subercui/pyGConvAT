@@ -58,7 +58,7 @@ def train(epoch):
         labels = Variable(torch.LongTensor(y_train[idx:idx+batch])).to(args.device)
         optimizer.zero_grad()
         # forward
-        output = model(features, adj).detach().cpu()
+        output = model(features, adj)
         #output_epoch.append(output.data.numpy())
         output = output.view(-1, 2)
         labels = labels.view(-1)
@@ -89,7 +89,7 @@ def train(epoch):
         for idx in range(0, len(x_test), batch):
             features_ = features[idx:idx+batch]
             adj_ = adj[idx:idx+batch]
-            output.append(model(features_, adj_).detach().cpu())
+            output.append(model(features_, adj_).detach())
         output = torch.cat(output, dim=0)
 
     output = output.view(-1, 2)
@@ -112,7 +112,7 @@ def compute_test():
 
     model.eval()
     output = model(features, adj)
-    output = output.view(-1, 2).detach().cpu()
+    output = output.view(-1, 2).detach()
     labels = labels.view(-1)
     loss_test = F.nll_loss(output, labels)
     tp, tn, fp, fn = statics(output, labels)
