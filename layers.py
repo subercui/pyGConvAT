@@ -138,7 +138,7 @@ class GraphConvAttentLayer(nn.Module):
         nn.init.xavier_uniform_(self.W.data, gain=1.414)
         self.a = nn.Parameter(torch.zeros(size=(conv_nfeat, 1)))
         nn.init.xavier_uniform_(self.a.data, gain=1.414)
-        self.W_b = nn.Parameter(torch.zeros(size=(in_features, out_features)))
+        self.W_b = nn.Parameter(torch.zeros(size=(conv_nfeat, out_features)))
         nn.init.xavier_uniform_(self.W_b.data, gain=1.414)
 
         self.leakyrelu = nn.LeakyReLU(self.alpha)
@@ -167,7 +167,7 @@ class GraphConvAttentLayer(nn.Module):
         if self.roll:
             pass
         else:
-            h_ = input.matmul(self.W_b)  # batch * nodes * features
+            h_ = a_input[:, torch.arange(a_input.size(2)), torch.arange(a_input.size(2)), :].matmul(self.W_b)  # batch * nodes * features
             h_prime = torch.matmul(attention, h_)  # (batch, nodes, features)
 
         if self.concat:
