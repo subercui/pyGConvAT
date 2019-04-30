@@ -3,6 +3,7 @@ from __future__ import print_function
 
 import os
 import glob
+import sys
 import time
 import random
 import argparse
@@ -20,6 +21,7 @@ from models import GAT, SpGAT, GConvAT, CNNBaseline, BrainDecode
 parser = argparse.ArgumentParser()
 parser.add_argument('--no-cuda', action='store_true', default=False, help='Disables CUDA training.')
 parser.add_argument('--fastmode', action='store_true', default=False, help='Validate during training pass.')
+parser.add_argument('--no-log', action='store_true', default=False, help='Print to stdout or log file')
 parser.add_argument('--sparse', action='store_true', default=False, help='GAT with sparse version or not.')
 parser.add_argument('--seed', type=int, default=72, help='Random seed.')
 parser.add_argument('--epochs', type=int, default=1000, help='Number of epochs to train.')
@@ -74,6 +76,8 @@ def train(epoch):
                 'Batch {:d}'.format(int(idx/batch)+1),
                 'loss_train: {:.4f}'.format(loss_train.data.item()),
                 'acc_train: {:.4f}'.format(acc_train.data.item()),
+                file=log_file,
+                flush=True
             )
 
     # test
@@ -100,7 +104,10 @@ def train(epoch):
           'loss_train: {:.4f}'.format(np.mean(np.array(loss_epoch))),
           '-- loss_val: {:.4f}'.format(loss_val.data.item()),
           'acc_val: {:.4f}'.format(acc_val.data.item()),
-          'time: {:.4f}s'.format(time.time() - t))
+          'time: {:.4f}s'.format(time.time() - t),
+          file=log_file,
+          flush=True
+          )
 
     return -acc_val.data.item()
 
@@ -121,6 +128,8 @@ def compute_test():
           "accuracy= {:.4f}".format((tp + tn) / (tp + fp + tn + fn)),
           "sensitivity= {:.4f}".format(tp / (tp + fn)),
           "specificity= {:.4f}".format(tn / (tn + fp)),
+          file=log_file,
+          flush=True
           )
 
 if __name__=='__main__':
@@ -165,6 +174,7 @@ if __name__=='__main__':
     save_dir = time.strftime('GConvAT(%b %d %H.%M.%S %Y)')
     os.mkdir(save_dir)
     with open('{}/settings.txt'.format(save_dir), 'w') as f: f.write(args.__str__())
+    log_file = sys.stdout if args.no_log else open('{}/logs.txt'.format(save_dir), 'w')
     loss_values = []
     bad_counter = 0
     best = args.epochs + 1
@@ -177,7 +187,7 @@ if __name__=='__main__':
             best = loss_values[-1]
             best_epoch = epoch
             bad_counter = 0
-            print('save best to:', save_dir)
+            print('save best to:', save_dir, file=log_file)
         else:
             bad_counter += 1
 
@@ -196,7 +206,7 @@ if __name__=='__main__':
         if epoch_nb > best_epoch:
             os.remove(file)
 
-    print("Optimization Finished!")
+    print("Optimization Finished!", file=log_file, flush=True)
     print("Total time elapsed: {:.4f}s".format(time.time() - t_total))
 
     # Restore best model
